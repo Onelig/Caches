@@ -6,8 +6,8 @@ namespace cache
 	template<typename Key, typename Value>
 	class LRU
 	{
-	private:
-		class Node
+	private: // List
+		struct Node
 		{
 			std::pair<Key, Value> val;
 			Node* next;
@@ -22,17 +22,38 @@ namespace cache
 			}
 		};
 
+		void moveNodeToFront(Node *temp);
 	public:
 		LRU(unsigned capacity);
 		~LRU();
 
+		void insert(const Key& key, const Value& value);
+		void insert(const Key& key, Value&& v);
+		// add emplace
 	private:
+		LRU(const LRU&) = delete;
+		LRU& operator=(const LRU&) = delete;
+
 		std::unordered_map<Key, Node*> cacheUMap;
 		Node* begin = new Node(-1, -1);
 		Node* end   = new Node(-1, -1);
 		unsigned capacity;
 	};
 
+
+	template<typename Key, typename Value>
+	void LRU<Key, Value>::moveNodeToFront(Node *temp)
+	{
+		Node* nextNode = temp->next;
+		Node* prevNode = temp->prev;
+		prevNode->next = nextNode;
+		nextNode->prev = prevNode;
+		temp->prev = nullptr;
+		temp->next = begin->next;
+		begin->next->prev = temp;
+		temp->prev = begin;
+		begin->next = temp;
+	}
 
 	template<typename Key, typename Value>
 	LRU<Key, Value>::LRU(unsigned capacity)
@@ -45,5 +66,35 @@ namespace cache
 		delete begin;
 		// + other fields it future
 		delete end;
+	}
+
+	template<typename Key, typename Value>
+	void LRU<Key, Value>::insert(const Key& key, const Value& value)
+	{
+		auto iter = cacheUMap.find(key);
+
+		if (iter != cacheUMap.end())
+		{
+			iter->second->val = value;
+			moveNodeToFront(iter->second);
+		}
+		else
+		{
+			//if (cacheUMap.size() == capacity)
+			//{
+			//	insertNode(key, value);
+			//}
+			//else
+			//{
+			//	deleteLastNode();
+			//	insertNode(key, value);
+			//}
+		}
+	}
+
+	template<typename Key, typename Value>
+	void LRU<Key, Value>::insert(const Key& key, Value&& v)
+	{
+		//  iter->second->val = std::move(value);
 	}
 }
