@@ -31,7 +31,7 @@ namespace cache
 		~LRU();
 
 		void insert(const Key& key, const Value& value);
-		void insert(const Key& key, Value&& v);
+		void insert(const Key& key, Value&& value);
 		// add emplace
 	private:
 		LRU(const LRU&) = delete;
@@ -80,7 +80,6 @@ namespace cache
 		nodeToRemove->prev->next = end;
 		end->prev = nodeToRemove->prev;
 
-		cacheUMap.erase(nodeToRemove->val.first);
 		delete(nodeToRemove);
 	}
 
@@ -113,7 +112,10 @@ namespace cache
 		else
 		{
 			if (cacheUMap.size() == capacity)
+			{
+				cacheUMap.erase(end->prev->val.first);
 				deleteLastNode();
+			}
 
 			Node* node = new Node(key, value);
 			insertNode(node);
@@ -122,8 +124,26 @@ namespace cache
 	}
 
 	template<typename Key, typename Value>
-	void LRU<Key, Value>::insert(const Key& key, Value&& v)
+	void LRU<Key, Value>::insert(const Key& key, Value&& value)
 	{
-		//  iter->second->val = std::move(value);
+		auto iter = cacheUMap.find(key);
+
+		if (iter != cacheUMap.end())
+		{
+			moveNodeToFront(iter->second);
+			iter->second->val.second = std::move(value);
+		}
+		else
+		{
+			if (cacheUMap.size() == capacity)
+			{
+				cacheUMap.erase(end->prev->val.first);
+				deleteLastNode();
+			}
+
+			Node* node = new Node(key, std::move(value));
+			insertNode(node);
+			cacheUMap[key] = node;
+		}
 	}
 }
