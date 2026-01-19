@@ -23,6 +23,7 @@ namespace cache
 		};
 
 		void moveNodeToFront(Node *temp);
+		void insertNode(Node* newNode);
 	public:
 		LRU(unsigned capacity);
 		~LRU();
@@ -44,21 +45,38 @@ namespace cache
 	template<typename Key, typename Value>
 	void LRU<Key, Value>::moveNodeToFront(Node *temp)
 	{
+		if (temp->prev == begin)
+			return;
+
 		Node* nextNode = temp->next;
 		Node* prevNode = temp->prev;
+
 		prevNode->next = nextNode;
 		nextNode->prev = prevNode;
-		temp->prev = nullptr;
-		temp->next = begin->next;
+
+		temp->next  = begin->next;
 		begin->next->prev = temp;
-		temp->prev = begin;
+		temp->prev  = begin;
 		begin->next = temp;
+	}
+
+	template<typename Key, typename Value>
+	void LRU<Key, Value>::insertNode(Node *newNode)
+	{
+		newNode->prev = begin;
+		newNode->next = begin->next;
+
+		begin->next->prev = newNode;
+		begin->next		  = newNode;
 	}
 
 	template<typename Key, typename Value>
 	LRU<Key, Value>::LRU(unsigned capacity)
 		: capacity(capacity)
-	{ }
+	{
+		begin->next = end;
+		end->prev   = begin;
+	}
 
 	template<typename Key, typename Value>
 	LRU<Key, Value>::~LRU()
@@ -80,15 +98,12 @@ namespace cache
 		}
 		else
 		{
-			//if (cacheUMap.size() == capacity)
-			//{
-			//	insertNode(key, value);
-			//}
-			//else
-			//{
+			if (cacheUMap.size() == capacity)
+			{}
 			//	deleteLastNode();
-			//	insertNode(key, value);
-			//}
+
+			Node* node = new Node(key, value);
+			insertNode(node);
 		}
 	}
 
