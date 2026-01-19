@@ -22,8 +22,10 @@ namespace cache
 			}
 		};
 
+
 		void moveNodeToFront(Node *temp);
 		void insertNode(Node* newNode);
+		void deleteLastNode();
 	public:
 		LRU(unsigned capacity);
 		~LRU();
@@ -71,6 +73,18 @@ namespace cache
 	}
 
 	template<typename Key, typename Value>
+	void LRU<Key, Value>::deleteLastNode()
+	{
+		Node* nodeToRemove = end->prev;
+
+		nodeToRemove->prev->next = end;
+		end->prev = nodeToRemove->prev;
+
+		cacheUMap.erase(nodeToRemove->val.first);
+		delete(nodeToRemove);
+	}
+
+	template<typename Key, typename Value>
 	LRU<Key, Value>::LRU(unsigned capacity)
 		: capacity(capacity)
 	{
@@ -93,17 +107,17 @@ namespace cache
 
 		if (iter != cacheUMap.end())
 		{
-			iter->second->val = value;
 			moveNodeToFront(iter->second);
+			iter->second->val.second = value;
 		}
 		else
 		{
 			if (cacheUMap.size() == capacity)
-			{}
-			//	deleteLastNode();
+				deleteLastNode();
 
 			Node* node = new Node(key, value);
 			insertNode(node);
+			cacheUMap[key] = node;
 		}
 	}
 
