@@ -22,7 +22,6 @@ namespace cache
 			}
 		};
 
-
 		void moveNodeToFront(Node *temp);
 		void insertNode(Node* newNode);
 		void deleteLastNode();
@@ -85,7 +84,7 @@ namespace cache
 
 	template<typename Key, typename Value>
 	LRU<Key, Value>::LRU(unsigned capacity)
-		: capacity(capacity)
+		: capacity(capacity == 0 ? 1 : capacity)
 	{
 		begin->next = end;
 		end->prev   = begin;
@@ -94,9 +93,14 @@ namespace cache
 	template<typename Key, typename Value>
 	LRU<Key, Value>::~LRU()
 	{
-		delete begin;
-		// + other fields it future
-		delete end;
+		Node* cur = begin;
+
+		while (cur)
+		{
+			Node* temp = begin;
+			cur = cur->next;
+			delete temp;
+		}
 	}
 
 	template<typename Key, typename Value>
