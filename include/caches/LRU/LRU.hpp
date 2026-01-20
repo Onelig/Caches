@@ -12,10 +12,11 @@ namespace cache
 			std::pair<Key, Value> val;
 			Node* next;
 			Node* prev;
+
 			template<class... Args>
 			Node(Key key, Args&&... args)
 				: val(key, Value(std::forward<Args>(args)...)),
-				  prev(nullptr),
+			      prev(nullptr),
 				  next(nullptr)
 			{ }
 		};
@@ -29,7 +30,9 @@ namespace cache
 
 		void insert(const Key& key, const Value& value);
 		void insert(const Key& key, Value&& value);
-		// add emplace
+
+		template<class... Args>
+		void emplace(const Key& key, Args&&... args);
 	private:
 		LRU(const LRU&) = delete;
 		LRU& operator=(const LRU&) = delete;
@@ -95,7 +98,7 @@ namespace cache
 
 		while (cur)
 		{
-			Node* temp = begin;
+			Node* temp = cur;
 			cur = cur->next;
 			delete temp;
 		}
@@ -144,6 +147,32 @@ namespace cache
 			}
 
 			Node* node = new Node(key, std::move(value));
+			insertNode(node);
+			cacheUMap[key] = node;
+		}
+	}
+
+	template<typename Key, typename Value>
+	template<class... Args>
+	void LRU<Key, Value>::emplace(const Key &key, Args&&... args)
+	{
+		auto iter = cacheUMap.find(key);
+
+		if (iter != cacheUMap.end())
+		{
+			moveNodeToFront(iter->second);
+			iter->second->val.second.~Value();
+			new (&iter->second->val.second) Value(std::forward<Args>(args)...);
+		}
+		else
+		{
+			if (cacheUMap.size() == capacity)
+			{
+				cacheUMap.erase(end->prev->val.first);
+				deleteLastNode();
+			}
+
+			Node* node = new Node(key, std::forward<Args>(args)...);
 			insertNode(node);
 			cacheUMap[key] = node;
 		}
