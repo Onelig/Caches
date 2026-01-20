@@ -52,7 +52,7 @@ namespace cache
 
 		bool contains(const Key& key) const;
 		bool empty() const;
-		bool size() const;
+		unsigned size() const;
 		unsigned capacity() const;
 		bool full() const;
 	private:
@@ -114,7 +114,14 @@ namespace cache
 	template<typename Key, typename Value>
 	LRU<Key, Value>::~LRU()
 	{
-		clear();
+		Node* cur = begin;
+
+		while (cur)
+		{
+			Node* temp = cur;
+			cur = cur->next;
+			delete temp;
+		}
 	}
 
 	template<typename Key, typename Value>
@@ -201,7 +208,7 @@ namespace cache
 		Node* nodeTmp = findIter->second;
 
 		moveNodeToFront(nodeTmp);
-		return nodeTmp->val;
+		return nodeTmp->val.second;
 	}
 
 	template<typename Key, typename Value>
@@ -213,7 +220,7 @@ namespace cache
 
 		Node* nodeTmp = findIter->second;
 
-		return nodeTmp->val;
+		return nodeTmp->val.second;
 	}
 
 	template<typename Key, typename Value>
@@ -231,14 +238,18 @@ namespace cache
 	template<typename Key, typename Value>
 	void LRU<Key, Value>::clear()
 	{
-		Node* cur = begin;
+		Node* cur = begin->next;
 
-		while (cur)
+		while (cur != end)
 		{
 			Node* temp = cur;
 			cur = cur->next;
 			delete temp;
 		}
+		begin->next = end;
+		end->prev = begin;
+
+		cacheUMap.clear();
 	}
 
 	template<typename Key, typename Value>
@@ -267,7 +278,7 @@ namespace cache
 	}
 
 	template<typename Key, typename Value>
-	bool LRU<Key, Value>::size() const
+	unsigned LRU<Key, Value>::size() const
 	{
 		return cacheUMap.size();
 	}
