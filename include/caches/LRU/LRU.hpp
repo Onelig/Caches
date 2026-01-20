@@ -30,9 +30,9 @@ namespace cache
 
 		void insert(const Key& key, const Value& value);
 		void insert(const Key& key, Value&& value);
-
 		template<class... Args>
 		void emplace(const Key& key, Args&&... args);
+		bool contains(const Key& key) const;
 	private:
 		LRU(const LRU&) = delete;
 		LRU& operator=(const LRU&) = delete;
@@ -176,5 +176,11 @@ namespace cache
 			insertNode(node);
 			cacheUMap[key] = node;
 		}
+	}
+
+	template<typename Key, typename Value>
+	bool LRU<Key, Value>::contains(const Key &key) const
+	{
+		return cacheUMap.find(key) != cacheUMap.end();
 	}
 }
