@@ -1,8 +1,17 @@
 #pragma once
+#include <stdexcept>
 #include <unordered_map>
 
 namespace cache
 {
+	class KeyNotFound : public std::invalid_argument
+	{
+	public:
+		KeyNotFound()
+			: std::invalid_argument("Key not found")
+		{ }
+	};
+
 	template<typename Key, typename Value>
 	class LRU
 	{
@@ -23,7 +32,7 @@ namespace cache
 
 		void moveNodeToFront(Node *temp);
 		void insertNode(Node* newNode);
-		void deleteLastNode();
+		void deleteNode(Node* nodeToRemove);
 
 	public:
 		LRU(unsigned capacity);
@@ -34,6 +43,7 @@ namespace cache
 		template<class... Args>
 		void emplace(const Key& key, Args&&... args);
 		Value get(const Key& key);
+		bool erase(const Key& key);
 
 		bool contains(const Key& key) const;
 		bool empty() const;
@@ -78,12 +88,10 @@ namespace cache
 	}
 
 	template<typename Key, typename Value>
-	void LRU<Key, Value>::deleteLastNode()
+	void LRU<Key, Value>::deleteNode(Node* nodeToRemove)
 	{
-		Node* nodeToRemove = end->prev;
-
-		nodeToRemove->prev->next = end;
-		end->prev = nodeToRemove->prev;
+		nodeToRemove->prev->next = nodeToRemove->next;
+		nodeToRemove->next->prev = nodeToRemove->prev;
 
 		delete(nodeToRemove);
 	}
@@ -124,7 +132,7 @@ namespace cache
 			if (cacheUMap.size() == capacity)
 			{
 				cacheUMap.erase(end->prev->val.first);
-				deleteLastNode();
+				deleteNode(end->prev);
 			}
 
 			Node* node = new Node(key, value);
@@ -148,7 +156,7 @@ namespace cache
 			if (cacheUMap.size() == capacity)
 			{
 				cacheUMap.erase(end->prev->val.first);
-				deleteLastNode();
+				deleteNode(end->prev);
 			}
 
 			Node* node = new Node(key, std::move(value));
@@ -174,7 +182,7 @@ namespace cache
 			if (cacheUMap.size() == capacity)
 			{
 				cacheUMap.erase(end->prev->val.first);
-				deleteLastNode();
+				deleteNode(end->prev);
 			}
 
 			Node* node = new Node(key, std::forward<Args>(args)...);
@@ -186,10 +194,26 @@ namespace cache
 	template<typename Key, typename Value>
 	Value LRU<Key, Value>::get(const Key &key)
 	{
-		auto nodeTmp = cacheUMap[key];
-		moveNodeToFront(nodeTmp);
+		auto findIter = cacheUMap.find(key);
+		if (findIter == cacheUMap.end())
+			throw KeyNotFound();
 
+		Node* nodeTmp = findIter->second;
+
+		moveNodeToFront(nodeTmp);
 		return nodeTmp->val;
+	}
+
+	template<typename Key, typename Value>
+	bool LRU<Key, Value>::erase(const Key &key)
+	{
+		auto findIter = cacheUMap.find(key);
+		if (findIter == cacheUMap.end())
+			return false;
+
+		deleteNode(findIter->second);
+		cacheUMap.erase(findIter);
+		return true;
 	}
 
 	template<typename Key, typename Value>
