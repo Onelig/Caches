@@ -24,6 +24,7 @@ namespace cache
 		void moveNodeToFront(Node *temp);
 		void insertNode(Node* newNode);
 		void deleteLastNode();
+
 	public:
 		LRU(unsigned capacity);
 		~LRU();
@@ -32,7 +33,11 @@ namespace cache
 		void insert(const Key& key, Value&& value);
 		template<class... Args>
 		void emplace(const Key& key, Args&&... args);
+		Value get(const Key& key);
+
 		bool contains(const Key& key) const;
+		bool empty() const;
+		bool size() const;
 	private:
 		LRU(const LRU&) = delete;
 		LRU& operator=(const LRU&) = delete;
@@ -179,8 +184,29 @@ namespace cache
 	}
 
 	template<typename Key, typename Value>
+	Value LRU<Key, Value>::get(const Key &key)
+	{
+		auto nodeTmp = cacheUMap[key];
+		moveNodeToFront(nodeTmp);
+
+		return nodeTmp->val;
+	}
+
+	template<typename Key, typename Value>
 	bool LRU<Key, Value>::contains(const Key &key) const
 	{
 		return cacheUMap.find(key) != cacheUMap.end();
+	}
+
+	template<typename Key, typename Value>
+	bool LRU<Key, Value>::empty() const
+	{
+		return cacheUMap.empty();
+	}
+
+	template<typename Key, typename Value>
+	bool LRU<Key, Value>::size() const
+	{
+		return capacity;
 	}
 }
