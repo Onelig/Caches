@@ -48,6 +48,7 @@ namespace cache
 
 		bool erase(const Key& key);
 		void clear();
+		void set_capacity(unsigned newCap);
 
 		bool contains(const Key& key) const;
 		bool empty() const;
@@ -237,6 +238,19 @@ namespace cache
 			Node* temp = cur;
 			cur = cur->next;
 			delete temp;
+		}
+	}
+
+	template<typename Key, typename Value>
+	void LRU<Key, Value>::set_capacity(unsigned newCap)
+	{
+		capacity_ = (newCap == 0 ? 1 : newCap);
+
+		while (cacheUMap.size() > capacity_)
+		{
+			Node* node = end->prev;
+			cacheUMap.erase(node->val.first);
+			deleteNode(node);
 		}
 	}
 
