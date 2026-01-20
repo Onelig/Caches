@@ -12,14 +12,12 @@ namespace cache
 			std::pair<Key, Value> val;
 			Node* next;
 			Node* prev;
-			Node(Key key, Value value)
-			{
-				val.first = key;
-				val.second = value;
-
-				next = nullptr;
-				prev = nullptr;
-			}
+			template<class... Args>
+			Node(Key key, Args&&... args)
+				: val(key, Value(std::forward<Args>(args)...)),
+				  prev(nullptr),
+				  next(nullptr)
+			{ }
 		};
 
 		void moveNodeToFront(Node *temp);
