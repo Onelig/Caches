@@ -5,7 +5,8 @@ project(caches
     LANGUAGES CXX
 )
 
-add_library(caches INTERFACE)
+add_library(caches INTERFACE
+        test/LRU-test/lru_capacity.cc)
 
 target_include_directories(caches
         INTERFACE
@@ -19,5 +20,5 @@ option(CACHES_BUILD_TESTS "Build caches tests" ON)
 
 if (CACHES_BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests)
+    add_subdirectory(test)
 endif()

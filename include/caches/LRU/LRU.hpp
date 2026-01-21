@@ -60,8 +60,8 @@ namespace cache
 		LRU& operator=(const LRU&) = delete;
 
 		std::unordered_map<Key, Node*> cacheUMap;
-		Node* begin = new Node(-1, -1);
-		Node* end   = new Node(-1, -1);
+		Node* begin = new Node(Key{}, Value{});
+		Node* end   = new Node(Key{}, Value{});
 		unsigned capacity_;
 	};
 
