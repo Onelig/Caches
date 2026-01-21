@@ -1,6 +1,7 @@
 #pragma once
 #include <stdexcept>
 #include <unordered_map>
+#include <mutex>
 
 namespace cache
 {
@@ -12,7 +13,15 @@ namespace cache
 		{ }
 	};
 
-	template<typename Key, typename Value>
+	class NullLock
+	{
+	public:
+		void lock() { }
+		void unlock() { }
+		bool try_lock() { return true; }
+	};
+
+	template<typename Key, typename Value, class LockT = NullLock>
 	class LRU
 	{
 	private: // List
@@ -21,6 +30,10 @@ namespace cache
 			std::pair<Key, Value> val;
 			Node* next;
 			Node* prev;
+
+			Node()
+				: prev(nullptr), next(nullptr)
+			{ }
 
 			template<class... Args>
 			Node(Key key, Args&&... args)
@@ -34,6 +47,9 @@ namespace cache
 		void insertNode(Node* newNode);
 		void deleteNode(Node* nodeToRemove);
 
+		void eraseFullNode(Node* temp);
+
+		using Guard = std::lock_guard<LockT>;
 	public:
 		LRU(unsigned capacity_);
 		~LRU();
@@ -58,19 +74,21 @@ namespace cache
 
 		Value& operator[](const Key& key);
 		const Value& operator[](const Key& key) const;
+
 	private:
 		LRU(const LRU&) = delete;
 		LRU& operator=(const LRU&) = delete;
 
+		mutable LockT lock_;
 		std::unordered_map<Key, Node*> cacheUMap;
-		Node* begin = new Node(Key{}, Value{});
-		Node* end   = new Node(Key{}, Value{});
+		Node* begin = new Node();
+		Node* end   = new Node();
 		unsigned capacity_;
 	};
 
 
-	template<typename Key, typename Value>
-	void LRU<Key, Value>::moveNodeToFront(Node *temp)
+	template<typename Key, typename Value, class lock>
+	void LRU<Key, Value, lock>::moveNodeToFront(Node *temp)
 	{
 		if (temp->prev == begin)
 			return;
@@ -87,8 +105,8 @@ namespace cache
 		begin->next = temp;
 	}
 
-	template<typename Key, typename Value>
-	void LRU<Key, Value>::insertNode(Node *newNode)
+	template<typename Key, typename Value, class lock>
+	void LRU<Key, Value, lock>::insertNode(Node *newNode)
 	{
 		newNode->prev = begin;
 		newNode->next = begin->next;
@@ -97,8 +115,8 @@ namespace cache
 		begin->next		  = newNode;
 	}
 
-	template<typename Key, typename Value>
-	void LRU<Key, Value>::deleteNode(Node* nodeToRemove)
+	template<typename Key, typename Value, class lock>
+	void LRU<Key, Value, lock>::deleteNode(Node* nodeToRemove)
 	{
 		nodeToRemove->prev->next = nodeToRemove->next;
 		nodeToRemove->next->prev = nodeToRemove->prev;
@@ -106,16 +124,23 @@ namespace cache
 		delete(nodeToRemove);
 	}
 
-	template<typename Key, typename Value>
-	LRU<Key, Value>::LRU(unsigned capacity_)
+	template<typename Key, typename Value, class LockT>
+	void LRU<Key, Value, LockT>::eraseFullNode(Node *temp)
+	{
+		cacheUMap.erase(temp->val.first);
+		deleteNode(temp);
+	}
+
+	template<typename Key, typename Value, class lock>
+	LRU<Key, Value, lock>::LRU(unsigned capacity_)
 		: capacity_(capacity_ == 0 ? 1 : capacity_)
 	{
 		begin->next = end;
 		end->prev   = begin;
 	}
 
-	template<typename Key, typename Value>
-	LRU<Key, Value>::~LRU()
+	template<typename Key, typename Value, class lock>
+	LRU<Key, Value, lock>::~LRU()
 	{
 		Node* cur = begin;
 
@@ -127,9 +152,10 @@ namespace cache
 		}
 	}
 
-	template<typename Key, typename Value>
-	void LRU<Key, Value>::insert(const Key& key, const Value& value)
+	template<typename Key, typename Value, class lock>
+	void LRU<Key, Value, lock>::insert(const Key& key, const Value& value)
 	{
+		Guard g(lock_);
 		auto iter = cacheUMap.find(key);
 
 		if (iter != cacheUMap.end())
@@ -140,10 +166,7 @@ namespace cache
 		else
 		{
 			if (cacheUMap.size() == capacity_)
-			{
-				cacheUMap.erase(end->prev->val.first);
-				deleteNode(end->prev);
-			}
+				eraseFullNode(end->prev);
 
 			Node* node = new Node(key, value);
 			insertNode(node);
@@ -151,9 +174,10 @@ namespace cache
 		}
 	}
 
-	template<typename Key, typename Value>
-	void LRU<Key, Value>::insert(const Key& key, Value&& value)
+	template<typename Key, typename Value, class lock>
+	void LRU<Key, Value, lock>::insert(const Key& key, Value&& value)
 	{
+		Guard g(lock_);
 		auto iter = cacheUMap.find(key);
 
 		if (iter != cacheUMap.end())
@@ -164,10 +188,7 @@ namespace cache
 		else
 		{
 			if (cacheUMap.size() == capacity_)
-			{
-				cacheUMap.erase(end->prev->val.first);
-				deleteNode(end->prev);
-			}
+				eraseFullNode(end->prev);
 
 			Node* node = new Node(key, std::move(value));
 			insertNode(node);
@@ -175,25 +196,22 @@ namespace cache
 		}
 	}
 
-	template<typename Key, typename Value>
+	template<typename Key, typename Value, class lock>
 	template<class... Args>
-	void LRU<Key, Value>::emplace(const Key &key, Args&&... args)
+	void LRU<Key, Value, lock>::emplace(const Key &key, Args&&... args)
 	{
+		Guard g(lock_);
 		auto iter = cacheUMap.find(key);
 
 		if (iter != cacheUMap.end())
 		{
 			moveNodeToFront(iter->second);
-			iter->second->val.second.~Value();
-			new (&iter->second->val.second) Value(std::forward<Args>(args)...);
+			iter->second->val.second = Value(std::forward<Args>(args)...);
 		}
 		else
 		{
 			if (cacheUMap.size() == capacity_)
-			{
-				cacheUMap.erase(end->prev->val.first);
-				deleteNode(end->prev);
-			}
+				eraseFullNode(end->prev);
 
 			Node* node = new Node(key, std::forward<Args>(args)...);
 			insertNode(node);
@@ -201,9 +219,10 @@ namespace cache
 		}
 	}
 
-	template<typename Key, typename Value>
-	Value& LRU<Key, Value>::get(const Key &key)
+	template<typename Key, typename Value, class lock>
+	Value& LRU<Key, Value, lock>::get(const Key &key)
 	{
+		Guard g(lock_);
 		auto findIter = cacheUMap.find(key);
 		if (findIter == cacheUMap.end())
 			throw KeyNotFound();
@@ -214,9 +233,10 @@ namespace cache
 		return nodeTmp->val.second;
 	}
 
-	template<typename Key, typename Value>
-	const Value& LRU<Key, Value>::peek(const Key& key) const
+	template<typename Key, typename Value, class lock>
+	const Value& LRU<Key, Value, lock>::peek(const Key& key) const
 	{
+		Guard g(lock_);
 		auto findIter = cacheUMap.find(key);
 		if (findIter == cacheUMap.end())
 			throw KeyNotFound();
@@ -226,21 +246,22 @@ namespace cache
 		return nodeTmp->val.second;
 	}
 
-	template<typename Key, typename Value>
-	bool LRU<Key, Value>::erase(const Key &key)
+	template<typename Key, typename Value, class lock>
+	bool LRU<Key, Value, lock>::erase(const Key &key)
 	{
+		Guard g(lock_);
 		auto findIter = cacheUMap.find(key);
 		if (findIter == cacheUMap.end())
 			return false;
 
-		deleteNode(findIter->second);
-		cacheUMap.erase(findIter);
+		eraseFullNode(findIter->second);
 		return true;
 	}
 
-	template<typename Key, typename Value>
-	void LRU<Key, Value>::clear()
+	template<typename Key, typename Value, class lock>
+	void LRU<Key, Value, lock>::clear()
 	{
+		Guard g(lock_);
 		Node* cur = begin->next;
 
 		while (cur != end)
@@ -255,9 +276,10 @@ namespace cache
 		cacheUMap.clear();
 	}
 
-	template<typename Key, typename Value>
-	void LRU<Key, Value>::set_capacity(unsigned newCap)
+	template<typename Key, typename Value, class lock>
+	void LRU<Key, Value, lock>::set_capacity(unsigned newCap)
 	{
+		Guard g(lock_);
 		capacity_ = (newCap == 0 ? 1 : newCap);
 
 		while (cacheUMap.size() > capacity_)
@@ -268,44 +290,49 @@ namespace cache
 		}
 	}
 
-	template<typename Key, typename Value>
-	bool LRU<Key, Value>::contains(const Key &key) const
+	template<typename Key, typename Value, class lock>
+	bool LRU<Key, Value, lock>::contains(const Key &key) const
 	{
+		Guard g(lock_);
 		return cacheUMap.find(key) != cacheUMap.end();
 	}
 
-	template<typename Key, typename Value>
-	bool LRU<Key, Value>::empty() const
+	template<typename Key, typename Value, class lock>
+	bool LRU<Key, Value, lock>::empty() const
 	{
+		Guard g(lock_);
 		return cacheUMap.empty();
 	}
 
-	template<typename Key, typename Value>
-	unsigned LRU<Key, Value>::size() const
+	template<typename Key, typename Value, class lock>
+	unsigned LRU<Key, Value, lock>::size() const
 	{
+		Guard g(lock_);
 		return cacheUMap.size();
 	}
 
-	template<typename Key, typename Value>
-	unsigned LRU<Key, Value>::capacity() const
+	template<typename Key, typename Value, class lock>
+	unsigned LRU<Key, Value, lock>::capacity() const
 	{
+		Guard g(lock_);
 		return capacity_;
 	}
 
-	template<typename Key, typename Value>
-	bool LRU<Key, Value>::full() const
+	template<typename Key, typename Value, class lock>
+	bool LRU<Key, Value, lock>::full() const
 	{
-		return size() == capacity();
+		Guard g(lock_);
+		return cacheUMap.size() == capacity_;
 	}
 
-	template<typename Key, typename Value>
-	Value& LRU<Key, Value>::operator[](const Key& key)
+	template<typename Key, typename Value, class lock>
+	Value& LRU<Key, Value, lock>::operator[](const Key& key)
 	{
 		return get(key);
 	}
 
-	template<typename Key, typename Value>
-	const Value & LRU<Key, Value>::operator[](const Key& key) const
+	template<typename Key, typename Value, class lock>
+	const Value & LRU<Key, Value, lock>::operator[](const Key& key) const
 	{
 		return peek(key);
 	}
