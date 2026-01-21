@@ -2,6 +2,8 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <mutex>
+#include <type_traits>
+#include <functional>
 
 namespace cache
 {
@@ -21,9 +23,31 @@ namespace cache
 		bool try_lock() { return true; }
 	};
 
+	template<typename T, typename = void>
+	struct has_hash : std::false_type
+	{ };
+
+	template<typename T>
+	struct has_hash<T, decltype(void(std::declval<std::hash<T>>()(std::declval<T>())))> : std::true_type
+	{ };
+
+	template<typename T, typename = void>
+	struct has_less_comp : std::false_type
+	{ };
+
+	template<typename T>
+	struct has_less_comp<T, decltype(void(std::declval<T&>() < std::declval<T&>()))> : std::true_type
+	{ };
+
+
 	template<typename Key, typename Value, class LockT = NullLock>
 	class LRU
 	{
+		static_assert(
+			has_hash<Key>::value || has_less_comp<Key>::value,
+			"Key must be hashable (unordered_map) or less-comparable (map)"
+		);
+
 	private: // List
 		struct Node
 		{
@@ -50,6 +74,9 @@ namespace cache
 		void eraseFullNode(Node* temp);
 
 		using Guard = std::lock_guard<LockT>;
+		using mapT  = std::conditional_t<has_hash<Key>::value,
+						std::unordered_map<Key, Node*>,
+						std::map<Key, Node*>>;
 	public:
 		LRU(unsigned capacity_);
 		~LRU();
@@ -80,7 +107,7 @@ namespace cache
 		LRU& operator=(const LRU&) = delete;
 
 		mutable LockT lock_;
-		std::unordered_map<Key, Node*> cacheUMap;
+		mapT cache_;
 		Node* begin = new Node();
 		Node* end   = new Node();
 		unsigned capacity_;
@@ -127,7 +154,7 @@ namespace cache
 	template<typename Key, typename Value, class LockT>
 	void LRU<Key, Value, LockT>::eraseFullNode(Node *temp)
 	{
-		cacheUMap.erase(temp->val.first);
+		cache_.erase(temp->val.first);
 		deleteNode(temp);
 	}
 
@@ -156,21 +183,21 @@ namespace cache
 	void LRU<Key, Value, lock>::insert(const Key& key, const Value& value)
 	{
 		Guard g(lock_);
-		auto iter = cacheUMap.find(key);
+		auto iter = cache_.find(key);
 
-		if (iter != cacheUMap.end())
+		if (iter != cache_.end())
 		{
 			moveNodeToFront(iter->second);
 			iter->second->val.second = value;
 		}
 		else
 		{
-			if (cacheUMap.size() == capacity_)
+			if (cache_.size() == capacity_)
 				eraseFullNode(end->prev);
 
 			Node* node = new Node(key, value);
 			insertNode(node);
-			cacheUMap[key] = node;
+			cache_[key] = node;
 		}
 	}
 
@@ -178,21 +205,21 @@ namespace cache
 	void LRU<Key, Value, lock>::insert(const Key& key, Value&& value)
 	{
 		Guard g(lock_);
-		auto iter = cacheUMap.find(key);
+		auto iter = cache_.find(key);
 
-		if (iter != cacheUMap.end())
+		if (iter != cache_.end())
 		{
 			moveNodeToFront(iter->second);
 			iter->second->val.second = std::move(value);
 		}
 		else
 		{
-			if (cacheUMap.size() == capacity_)
+			if (cache_.size() == capacity_)
 				eraseFullNode(end->prev);
 
 			Node* node = new Node(key, std::move(value));
 			insertNode(node);
-			cacheUMap[key] = node;
+			cache_[key] = node;
 		}
 	}
 
@@ -201,21 +228,21 @@ namespace cache
 	void LRU<Key, Value, lock>::emplace(const Key &key, Args&&... args)
 	{
 		Guard g(lock_);
-		auto iter = cacheUMap.find(key);
+		auto iter = cache_.find(key);
 
-		if (iter != cacheUMap.end())
+		if (iter != cache_.end())
 		{
 			moveNodeToFront(iter->second);
 			iter->second->val.second = Value(std::forward<Args>(args)...);
 		}
 		else
 		{
-			if (cacheUMap.size() == capacity_)
+			if (cache_.size() == capacity_)
 				eraseFullNode(end->prev);
 
 			Node* node = new Node(key, std::forward<Args>(args)...);
 			insertNode(node);
-			cacheUMap[key] = node;
+			cache_[key] = node;
 		}
 	}
 
@@ -223,8 +250,8 @@ namespace cache
 	Value& LRU<Key, Value, lock>::get(const Key &key)
 	{
 		Guard g(lock_);
-		auto findIter = cacheUMap.find(key);
-		if (findIter == cacheUMap.end())
+		auto findIter = cache_.find(key);
+		if (findIter == cache_.end())
 			throw KeyNotFound();
 
 		Node* nodeTmp = findIter->second;
@@ -237,8 +264,8 @@ namespace cache
 	const Value& LRU<Key, Value, lock>::peek(const Key& key) const
 	{
 		Guard g(lock_);
-		auto findIter = cacheUMap.find(key);
-		if (findIter == cacheUMap.end())
+		auto findIter = cache_.find(key);
+		if (findIter == cache_.end())
 			throw KeyNotFound();
 
 		Node* nodeTmp = findIter->second;
@@ -250,8 +277,8 @@ namespace cache
 	bool LRU<Key, Value, lock>::erase(const Key &key)
 	{
 		Guard g(lock_);
-		auto findIter = cacheUMap.find(key);
-		if (findIter == cacheUMap.end())
+		auto findIter = cache_.find(key);
+		if (findIter == cache_.end())
 			return false;
 
 		eraseFullNode(findIter->second);
@@ -273,7 +300,7 @@ namespace cache
 		begin->next = end;
 		end->prev = begin;
 
-		cacheUMap.clear();
+		cache_.clear();
 	}
 
 	template<typename Key, typename Value, class lock>
@@ -282,10 +309,10 @@ namespace cache
 		Guard g(lock_);
 		capacity_ = (newCap == 0 ? 1 : newCap);
 
-		while (cacheUMap.size() > capacity_)
+		while (cache_.size() > capacity_)
 		{
 			Node* node = end->prev;
-			cacheUMap.erase(node->val.first);
+			cache_.erase(node->val.first);
 			deleteNode(node);
 		}
 	}
@@ -294,21 +321,21 @@ namespace cache
 	bool LRU<Key, Value, lock>::contains(const Key &key) const
 	{
 		Guard g(lock_);
-		return cacheUMap.find(key) != cacheUMap.end();
+		return cache_.find(key) != cache_.end();
 	}
 
 	template<typename Key, typename Value, class lock>
 	bool LRU<Key, Value, lock>::empty() const
 	{
 		Guard g(lock_);
-		return cacheUMap.empty();
+		return cache_.empty();
 	}
 
 	template<typename Key, typename Value, class lock>
 	unsigned LRU<Key, Value, lock>::size() const
 	{
 		Guard g(lock_);
-		return cacheUMap.size();
+		return cache_.size();
 	}
 
 	template<typename Key, typename Value, class lock>
@@ -322,7 +349,7 @@ namespace cache
 	bool LRU<Key, Value, lock>::full() const
 	{
 		Guard g(lock_);
-		return cacheUMap.size() == capacity_;
+		return cache_.size() == capacity_;
 	}
 
 	template<typename Key, typename Value, class lock>
