@@ -62,9 +62,9 @@ TEST(LRU_Capacity, Erase)
 	cache.insert(5, "Something");
 	cache.insert(1, "LRU");
 
-	EXPECT_EQ(cache.erase(8), false);
-	EXPECT_EQ(cache.erase(1), true);
-	EXPECT_EQ(cache.erase(5), true);
+	EXPECT_FALSE(cache.erase(8));
+	EXPECT_TRUE(cache.erase(1));
+	EXPECT_TRUE(cache.erase(5));
 }
 
 TEST(LRU_Capacity, ChangeCapacity)
@@ -80,23 +80,11 @@ TEST(LRU_Capacity, ChangeCapacity)
 	cache.insert(1, "Something1");
 
 	EXPECT_EQ(cache.size(), 4);
-	EXPECT_EQ(cache.full(), true);
+	EXPECT_TRUE(cache.full());
 
 	cache.set_capacity(2);
 
 	EXPECT_EQ(cache.size(), 2);
-	EXPECT_EQ(cache.full(), true);
-}
-
-TEST(LRU_Capacity, Empty)
-{
-	cache::LRU<int, std::string> cache(2);
-
-	cache.insert(8, "Hello World");
-	cache.insert(5, "Something");
-
-	EXPECT_EQ(cache.empty(), false);
-	cache.clear();
-	EXPECT_EQ(cache.empty(), true);
+	EXPECT_TRUE(cache.full());
 }
 

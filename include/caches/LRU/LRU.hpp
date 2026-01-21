@@ -55,6 +55,9 @@ namespace cache
 		unsigned size() const;
 		unsigned capacity() const;
 		bool full() const;
+
+		Value& operator[](const Key& key);
+		const Value& operator[](const Key& key) const;
 	private:
 		LRU(const LRU&) = delete;
 		LRU& operator=(const LRU&) = delete;
@@ -268,7 +271,7 @@ namespace cache
 	template<typename Key, typename Value>
 	bool LRU<Key, Value>::contains(const Key &key) const
 	{
-		return cacheUMap.contains(key);
+		return cacheUMap.find(key) != cacheUMap.end();
 	}
 
 	template<typename Key, typename Value>
@@ -293,5 +296,17 @@ namespace cache
 	bool LRU<Key, Value>::full() const
 	{
 		return size() == capacity();
+	}
+
+	template<typename Key, typename Value>
+	Value& LRU<Key, Value>::operator[](const Key& key)
+	{
+		return get(key);
+	}
+
+	template<typename Key, typename Value>
+	const Value & LRU<Key, Value>::operator[](const Key& key) const
+	{
+		return peek(key);
 	}
 }
