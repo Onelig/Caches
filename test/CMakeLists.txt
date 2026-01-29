@@ -14,6 +14,8 @@ add_executable(caches_tests
         LRU-test/lru_capacity.cc
         LRU-test/lru_contains.cc
         LRU-test/lru_SFINAE.cc
+
+        # LFU
 )
 
 target_link_libraries(caches_tests PRIVATE

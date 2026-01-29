@@ -5,8 +5,7 @@ project(caches
     LANGUAGES CXX
 )
 
-add_library(caches INTERFACE
-        test/LRU-test/lru_capacity.cc)
+add_library(caches INTERFACE)
 
 target_include_directories(caches
         INTERFACE
