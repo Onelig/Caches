@@ -16,14 +16,16 @@ namespace cache
 			typename std::list<Key>::iterator iter;
 		};
 
+		void updateLevel(typename std::unordered_map<Key, data>::iterator mpIter);
 	public:
 		LFU(std::size_t capacity);
 
 		void insert(const Key& key, const Value& value);
 		void insert(const Key& key, Value&& value);
 		template<class... Args>
-		void emplace(const Key& key, Args&&... args);
+		void emplace(const Key& key, Args&& ... args);
 
+		Value& get(const Key& key);
 	private:
 		std::size_t capacity_;
 		std::size_t minFreq;
@@ -34,12 +36,28 @@ namespace cache
 
 
 	template<typename Key, typename Value>
+	void LFU<Key, Value>::updateLevel(typename std::unordered_map<Key, data>::iterator mpIter)
+	{
+		// Update level
+		std::size_t oldFreq = mpIter->second.freq;
+		std::list<Key>& oldList = freq[oldFreq];
+
+		++mpIter->second.freq;
+		std::list<Key>& newList = freq[mpIter->second.freq];
+
+		newList.splice(newList.begin(), oldList, mpIter->second.iter);
+
+		if (oldFreq == minFreq && oldList.empty())
+			++minFreq;
+	}
+
+	template<typename Key, typename Value>
 	LFU<Key, Value>::LFU(std::size_t capacity)
 		: capacity_(capacity), minFreq(0)
 	{ }
 
 	template<typename Key, typename Value>
-	void LFU<Key, Value>::insert(const Key &key, const Value &value)
+	void LFU<Key, Value>::insert(const Key& key, const Value& value)
 	{
 		if (capacity_ == 0)
 			return;
@@ -49,17 +67,7 @@ namespace cache
 		{
 			mpIter->second.value = value;
 
-			// Update level
-			std::size_t oldFreq = mpIter->second.freq;
-			std::list<Key>& oldList = freq[oldFreq];
-
-			++mpIter->second.freq;
-			std::list<Key>& newList = freq[mpIter->second.freq];
-
-			newList.splice(newList.begin(), oldList, mpIter->second.iter);
-
-			if (oldFreq == minFreq && oldList.empty())
-				++minFreq;
+			updateLevel(mpIter);
 		}
 		else
 		{
@@ -79,7 +87,7 @@ namespace cache
 	}
 
 	template<typename Key, typename Value>
-	void LFU<Key, Value>::insert(const Key &key, Value &&value)
+	void LFU<Key, Value>::insert(const Key& key, Value&& value)
 	{
 		if (capacity_ == 0)
 			return;
@@ -89,17 +97,7 @@ namespace cache
 		{
 			mpIter->second.value = std::move(value);
 
-			// Update level
-			std::size_t oldFreq = mpIter->second.freq;
-			std::list<Key>& oldList = freq[oldFreq];
-
-			++mpIter->second.freq;
-			std::list<Key>& newList = freq[mpIter->second.freq];
-
-			newList.splice(newList.begin(), oldList, mpIter->second.iter);
-
-			if (oldFreq == minFreq && oldList.empty())
-				++minFreq;
+			updateLevel(mpIter);
 		}
 		else
 		{
@@ -119,8 +117,8 @@ namespace cache
 	}
 
 	template<typename Key, typename Value>
-	template<class ... Args>
-	void LFU<Key, Value>::emplace(const Key &key, Args &&...args)
+	template<class... Args>
+	void LFU<Key, Value>::emplace(const Key& key, Args&& ... args)
 	{
 		if (capacity_ == 0)
 			return;
@@ -130,17 +128,7 @@ namespace cache
 		{
 			mpIter->second.value = Value(std::forward<Args>(args)...);
 
-			// Update level
-			std::size_t oldFreq = mpIter->second.freq;
-			std::list<Key>& oldList = freq[oldFreq];
-
-			++mpIter->second.freq;
-			std::list<Key>& newList = freq[mpIter->second.freq];
-
-			newList.splice(newList.begin(), oldList, mpIter->second.iter);
-
-			if (oldFreq == minFreq && oldList.empty())
-				++minFreq;
+			updateLevel(mpIter);
 		}
 		else
 		{
@@ -157,5 +145,17 @@ namespace cache
 			ListW.push_front(key);
 			mp[key] = data{Value(std::forward<Args>(args)...), minFreq, ListW.begin()};
 		}
+	}
+
+	template<typename Key, typename Value>
+	Value& LFU<Key, Value>::get(const Key &key)
+	{
+		auto mpIter = mp.find(key);
+		if (mpIter == mp.end())
+			throw KeyNotFound();
+
+		updateLevel(mpIter);
+
+		return mpIter->second.value;
 	}
 }

@@ -127,7 +127,7 @@ namespace cache
 
 	template<typename Key, typename Value, class lock>
 	LRU<Key, Value, lock>::LRU(unsigned capacity_)
-		: capacity_(capacity_ == 0 ? 1 : capacity_)
+		: capacity_(capacity_)
 	{
 		begin->next = end;
 		end->prev   = begin;
@@ -150,6 +150,9 @@ namespace cache
 	void LRU<Key, Value, lock>::insert(const Key& key, const Value& value)
 	{
 		Guard g(lock_);
+		if (capacity_ == 0)
+			return;
+
 		auto iter = cache_.find(key);
 
 		if (iter != cache_.end())
@@ -172,6 +175,9 @@ namespace cache
 	void LRU<Key, Value, lock>::insert(const Key& key, Value&& value)
 	{
 		Guard g(lock_);
+		if (capacity_ == 0)
+			return;
+
 		auto iter = cache_.find(key);
 
 		if (iter != cache_.end())
@@ -195,6 +201,9 @@ namespace cache
 	void LRU<Key, Value, lock>::emplace(const Key &key, Args&&... args)
 	{
 		Guard g(lock_);
+		if (capacity_ == 0)
+			return;
+
 		auto iter = cache_.find(key);
 
 		if (iter != cache_.end())
@@ -217,6 +226,7 @@ namespace cache
 	Value& LRU<Key, Value, lock>::get(const Key &key)
 	{
 		Guard g(lock_);
+
 		auto findIter = cache_.find(key);
 		if (findIter == cache_.end())
 			throw KeyNotFound();
@@ -274,7 +284,7 @@ namespace cache
 	void LRU<Key, Value, lock>::set_capacity(unsigned newCap)
 	{
 		Guard g(lock_);
-		capacity_ = (newCap == 0 ? 1 : newCap);
+		capacity_ = newCap;
 
 		while (cache_.size() > capacity_)
 		{
