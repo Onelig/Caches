@@ -21,6 +21,8 @@ namespace cache
 
 		void insert(const Key& key, const Value& value);
 		void insert(const Key& key, Value&& value);
+		template<class... Args>
+		void emplace(const Key& key, Args&&... args);
 
 	private:
 		std::size_t capacity_;
@@ -113,6 +115,47 @@ namespace cache
 			auto& ListW = freq[minFreq];
 			ListW.push_front(key);
 			mp[key] = data{std::move(value), minFreq, ListW.begin()};
+		}
+	}
+
+	template<typename Key, typename Value>
+	template<class ... Args>
+	void LFU<Key, Value>::emplace(const Key &key, Args &&...args)
+	{
+		if (capacity_ == 0)
+			return;
+
+		auto mpIter = mp.find(key);
+		if (mpIter != mp.end())
+		{
+			mpIter->second.value = Value(std::forward<Args>(args)...);
+
+			// Update level
+			std::size_t oldFreq = mpIter->second.freq;
+			std::list<Key>& oldList = freq[oldFreq];
+
+			++mpIter->second.freq;
+			std::list<Key>& newList = freq[mpIter->second.freq];
+
+			newList.splice(newList.begin(), oldList, mpIter->second.iter);
+
+			if (oldFreq == minFreq && oldList.empty())
+				++minFreq;
+		}
+		else
+		{
+			if (capacity_ == mp.size())
+			{
+				// Remove element with min level
+				auto& ListW = freq[minFreq];
+				mp.erase(ListW.back());
+				ListW.pop_back();
+			}
+
+			minFreq = 0;
+			auto& ListW = freq[minFreq];
+			ListW.push_front(key);
+			mp[key] = data{Value(std::forward<Args>(args)...), minFreq, ListW.begin()};
 		}
 	}
 }
