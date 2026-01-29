@@ -26,6 +26,7 @@ namespace cache
 		void emplace(const Key& key, Args&& ... args);
 
 		Value& get(const Key& key);
+		const Value& peek(const Key& key) const;
 	private:
 		std::size_t capacity_;
 		std::size_t minFreq;
@@ -148,13 +149,23 @@ namespace cache
 	}
 
 	template<typename Key, typename Value>
-	Value& LFU<Key, Value>::get(const Key &key)
+	Value& LFU<Key, Value>::get(const Key& key)
 	{
 		auto mpIter = mp.find(key);
 		if (mpIter == mp.end())
 			throw KeyNotFound();
 
 		updateLevel(mpIter);
+
+		return mpIter->second.value;
+	}
+
+	template<typename Key, typename Value>
+	const Value & LFU<Key, Value>::peek(const Key& key) const
+	{
+		auto mpIter = mp.find(key);
+		if (mpIter == mp.end())
+			throw KeyNotFound();
 
 		return mpIter->second.value;
 	}
