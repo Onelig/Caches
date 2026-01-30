@@ -94,3 +94,20 @@ TEST(LFU_Capacity, ChangeCapacity)
 	EXPECT_TRUE(cache.full());
 	EXPECT_EQ(cache.size(), 0);
 }
+
+TEST(LFU_Capacity, CheckPrior)
+{
+	cache::LFU<int, std::string> cache(2);
+
+	cache.insert(5, "Something");
+	cache.insert(5, "Something");
+	cache.insert(5, "Something");
+	cache.insert(5, "Something");
+
+	EXPECT_EQ(cache.size(), 1);
+	cache.insert(9, "Hello World1");
+
+	EXPECT_EQ(cache.size(), 2);
+	cache.insert(94, "Hello World1");
+	EXPECT_ANY_THROW(cache.get(9));
+}
