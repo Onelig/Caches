@@ -45,7 +45,7 @@ namespace cache
 						std::unordered_map<Key, Node*>,
 						std::map<Key, Node*>>;
 	public:
-		LRU(unsigned capacity_);
+		LRU(std::size_t capacity_);
 		~LRU();
 
 		void insert(const Key& key, const Value& value);
@@ -58,12 +58,12 @@ namespace cache
 
 		bool erase(const Key& key);
 		void clear();
-		void set_capacity(unsigned newCap);
+		void set_capacity(std::size_t newCap);
 
 		bool contains(const Key& key) const;
 		bool empty() const;
-		unsigned size() const;
-		unsigned capacity() const;
+		std::size_t size() const;
+		std::size_t capacity() const;
 		bool full() const;
 
 		Value& operator[](const Key& key);
@@ -77,7 +77,7 @@ namespace cache
 		mapT cache_;
 		Node* begin = new Node();
 		Node* end   = new Node();
-		unsigned capacity_;
+		std::size_t capacity_;
 	};
 
 
@@ -126,7 +126,7 @@ namespace cache
 	}
 
 	template<typename Key, typename Value, class lock>
-	LRU<Key, Value, lock>::LRU(unsigned capacity_)
+	LRU<Key, Value, lock>::LRU(std::size_t capacity_)
 		: capacity_(capacity_)
 	{
 		begin->next = end;
@@ -281,7 +281,7 @@ namespace cache
 	}
 
 	template<typename Key, typename Value, class lock>
-	void LRU<Key, Value, lock>::set_capacity(unsigned newCap)
+	void LRU<Key, Value, lock>::set_capacity(std::size_t newCap)
 	{
 		Guard g(lock_);
 		capacity_ = newCap;
@@ -309,14 +309,14 @@ namespace cache
 	}
 
 	template<typename Key, typename Value, class lock>
-	unsigned LRU<Key, Value, lock>::size() const
+	std::size_t LRU<Key, Value, lock>::size() const
 	{
 		Guard g(lock_);
 		return cache_.size();
 	}
 
 	template<typename Key, typename Value, class lock>
-	unsigned LRU<Key, Value, lock>::capacity() const
+	std::size_t LRU<Key, Value, lock>::capacity() const
 	{
 		Guard g(lock_);
 		return capacity_;
