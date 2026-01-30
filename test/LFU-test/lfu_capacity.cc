@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
-#include <caches/LRU/LRU.hpp>
+#include <caches/LFU/LFU.hpp>
 #include <string>
 
-TEST(LRU_Capacity, Full)
+TEST(LFU_Capacity, Full)
 {
-	cache::LRU<int, int> cache(1);
+	cache::LFU<int, int> cache(1);
 
 	EXPECT_FALSE(cache.full());
 
@@ -17,9 +17,9 @@ TEST(LRU_Capacity, Full)
 	EXPECT_FALSE(cache.full());
 }
 
-TEST(LRU_Capacity, Insert)
+TEST(LFU_Capacity, Insert)
 {
-	cache::LRU<int, int> cache(3);
+	cache::LFU<int, int> cache(3);
 
 	cache.insert(1, 10);
 	cache.insert(1, 10);
@@ -31,13 +31,13 @@ TEST(LRU_Capacity, Insert)
 	EXPECT_EQ(cache.size(), 2);
 
 	cache.insert(31, 3);
-	cache.insert(31, 3);
+	cache.insert(3145, 1);
 	EXPECT_TRUE(cache.full());
 }
 
-TEST(LRU_Capacity, Emplace)
+TEST(LFU_Capacity, Emplace)
 {
-	cache::LRU<int, std::pair<int, int>> cache(3);
+	cache::LFU<int, std::pair<int, int>> cache(3);
 
 	cache.emplace(1, 10, 3);
 	cache.insert(1, std::pair<int, int>(213, 321));
@@ -54,24 +54,26 @@ TEST(LRU_Capacity, Emplace)
 	EXPECT_TRUE(cache.full());
 }
 
-TEST(LRU_Capacity, Erase)
+TEST(LFU_Capacity, Erase)
 {
-	cache::LRU<int, std::string> cache(2);
+	cache::LFU<int, std::string> cache(2);
 
 	cache.insert(8, "Hello World");
+	cache.insert(8, "Hello World");
 	cache.insert(5, "Something");
-	cache.insert(1, "LRU");
+	cache.insert(1, "LFU");
 
 	EXPECT_FALSE(cache.erase(8));
 	EXPECT_TRUE(cache.erase(1));
 	EXPECT_TRUE(cache.erase(5));
 }
 
-TEST(LRU_Capacity, ChangeCapacity)
+TEST(LFU_Capacity, ChangeCapacity)
 {
-	cache::LRU<int, std::string> cache(2);
+	cache::LFU<int, std::string> cache(2);
 
 	cache.insert(8, "Hello World");
+	cache.insert(5, "Something");
 	cache.insert(5, "Something");
 
 	cache.set_capacity(4);
@@ -92,4 +94,3 @@ TEST(LRU_Capacity, ChangeCapacity)
 	EXPECT_TRUE(cache.full());
 	EXPECT_EQ(cache.size(), 0);
 }
-
