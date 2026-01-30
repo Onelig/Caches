@@ -5,7 +5,7 @@
 
 namespace cache
 {
-	template<typename Key, typename Value>
+	template<typename Key, typename Value, class LockT = NullLock>
 	class LFU
 	{
 		static_assert(
@@ -20,10 +20,12 @@ namespace cache
 			std::size_t freqS;
 			typename std::list<Key>::iterator iter;
 		};
+		
+		using Guard = std::lock_guard<LockT>;
 		using mapKeyData = std::conditional_t<has_hash<Key>::value,
 								std::unordered_map<Key, data>,
 								std::map<Key, data>>;
-
+		
 		using mapFreqList = std::conditional_t<has_hash<Key>::value,
 								std::unordered_map<std::size_t, std::list<Key>>,
 								std::map<std::size_t, std::list<Key>>>;
@@ -56,14 +58,14 @@ namespace cache
 	private:
 		std::size_t capacity_;
 		std::size_t minFreq;
-
+		mutable LockT lock_;
 		mapKeyData mp;
 		mapFreqList freq;
 	};
 
 
-	template<typename Key, typename Value>
-	void LFU<Key, Value>::updateLevel(typename mapKeyData::iterator mpIter)
+	template<typename Key, typename Value, class lock>
+	void LFU<Key, Value, lock>::updateLevel(typename mapKeyData::iterator mpIter)
 	{
 		// Update level
 		std::size_t oldFreq = mpIter->second.freqS;
@@ -81,14 +83,15 @@ namespace cache
 		}
 	}
 
-	template<typename Key, typename Value>
-	LFU<Key, Value>::LFU(std::size_t capacity)
+	template<typename Key, typename Value, class lock>
+	LFU<Key, Value, lock>::LFU(std::size_t capacity)
 		: capacity_(capacity), minFreq(0)
 	{ }
 
-	template<typename Key, typename Value>
-	void LFU<Key, Value>::insert(const Key& key, const Value& value)
+	template<typename Key, typename Value, class lock>
+	void LFU<Key, Value, lock>::insert(const Key& key, const Value& value)
 	{
+		Guard g(lock_);
 		if (capacity_ == 0)
 			return;
 
@@ -118,9 +121,10 @@ namespace cache
 		}
 	}
 
-	template<typename Key, typename Value>
-	void LFU<Key, Value>::insert(const Key& key, Value&& value)
+	template<typename Key, typename Value, class lock>
+	void LFU<Key, Value, lock>::insert(const Key& key, Value&& value)
 	{
+		Guard g(lock_);
 		if (capacity_ == 0)
 			return;
 
@@ -150,10 +154,11 @@ namespace cache
 		}
 	}
 
-	template<typename Key, typename Value>
+	template<typename Key, typename Value, class lock>
 	template<class... Args>
-	void LFU<Key, Value>::emplace(const Key& key, Args&& ... args)
+	void LFU<Key, Value, lock>::emplace(const Key& key, Args&& ... args)
 	{
+		Guard g(lock_);
 		if (capacity_ == 0)
 			return;
 
@@ -183,9 +188,10 @@ namespace cache
 		}
 	}
 
-	template<typename Key, typename Value>
-	Value& LFU<Key, Value>::get(const Key& key)
+	template<typename Key, typename Value, class lock>
+	Value& LFU<Key, Value, lock>::get(const Key& key)
 	{
+		Guard g(lock_);
 		auto mpIter = mp.find(key);
 		if (mpIter == mp.end())
 			throw KeyNotFound();
@@ -195,9 +201,10 @@ namespace cache
 		return mpIter->second.value;
 	}
 
-	template<typename Key, typename Value>
-	const Value& LFU<Key, Value>::peek(const Key& key) const
+	template<typename Key, typename Value, class lock>
+	const Value& LFU<Key, Value, lock>::peek(const Key& key) const
 	{
+		Guard g(lock_);
 		auto mpIter = mp.find(key);
 		if (mpIter == mp.end())
 			throw KeyNotFound();
@@ -205,9 +212,10 @@ namespace cache
 		return mpIter->second.value;
 	}
 
-	template<typename Key, typename Value>
-	bool LFU<Key, Value>::erase(const Key& key)
+	template<typename Key, typename Value, class lock>
+	bool LFU<Key, Value, lock>::erase(const Key& key)
 	{
+		Guard g(lock_);
 		auto mpIter = mp.find(key);
 		if (mpIter == mp.end())
 			return false;
@@ -237,17 +245,19 @@ namespace cache
 		return true;
 	}
 
-	template<typename Key, typename Value>
-	void LFU<Key, Value>::clear()
+	template<typename Key, typename Value, class lock>
+	void LFU<Key, Value, lock>::clear()
 	{
+		Guard g(lock_);
 		mp.clear();
 		freq.clear();
 		minFreq = 0;
 	}
 
-	template<typename Key, typename Value>
-	void LFU<Key, Value>::set_capacity(std::size_t newCap)
+	template<typename Key, typename Value, class lock>
+	void LFU<Key, Value, lock>::set_capacity(std::size_t newCap)
 	{
+		Guard g(lock_);
 		capacity_ = newCap;
 
 		// Remove element if actual capacity less previous
@@ -279,44 +289,49 @@ namespace cache
 		}
 	}
 
-	template<typename Key, typename Value>
-	bool LFU<Key, Value>::contains(const Key &key) const
+	template<typename Key, typename Value, class lock>
+	bool LFU<Key, Value, lock>::contains(const Key &key) const
 	{
+		Guard g(lock_);
 		return mp.find(key) != mp.end();
 	}
 
-	template<typename Key, typename Value>
-	bool LFU<Key, Value>::empty() const
+	template<typename Key, typename Value, class lock>
+	bool LFU<Key, Value, lock>::empty() const
 	{
+		Guard g(lock_);
 		return mp.empty();
 	}
 
-	template<typename Key, typename Value>
-	std::size_t LFU<Key, Value>::size() const
+	template<typename Key, typename Value, class lock>
+	std::size_t LFU<Key, Value, lock>::size() const
 	{
+		Guard g(lock_);
 		return mp.size();
 	}
 
-	template<typename Key, typename Value>
-	std::size_t LFU<Key, Value>::capacity() const
+	template<typename Key, typename Value, class lock>
+	std::size_t LFU<Key, Value, lock>::capacity() const
 	{
+		Guard g(lock_);
 		return capacity_;
 	}
 
-	template<typename Key, typename Value>
-	bool LFU<Key, Value>::full() const
+	template<typename Key, typename Value, class lock>
+	bool LFU<Key, Value, lock>::full() const
 	{
+		Guard g(lock_);
 		return capacity_ == mp.size();
 	}
 
-	template<typename Key, typename Value>
-	Value& LFU<Key, Value>::operator[](const Key &key)
+	template<typename Key, typename Value, class lock>
+	Value& LFU<Key, Value, lock>::operator[](const Key &key)
 	{
 		return get(key);
 	}
 
-	template<typename Key, typename Value>
-	const Value& LFU<Key, Value>::operator[](const Key &key) const
+	template<typename Key, typename Value, class lock>
+	const Value& LFU<Key, Value, lock>::operator[](const Key &key) const
 	{
 		return peek(key);
 	}
