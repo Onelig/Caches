@@ -27,6 +27,10 @@ namespace cache
 
 		Value& get(const Key& key);
 		const Value& peek(const Key& key) const;
+
+		bool erase(const Key& key);
+		void clear();
+		void set_capacity(std::size_t newCap);
 	private:
 		std::size_t capacity_;
 		std::size_t minFreq;
@@ -49,7 +53,10 @@ namespace cache
 		newList.splice(newList.begin(), oldList, mpIter->second.iter);
 
 		if (oldFreq == minFreq && oldList.empty())
+		{
 			++minFreq;
+			freq.erase(oldFreq);
+		}
 	}
 
 	template<typename Key, typename Value>
@@ -67,7 +74,6 @@ namespace cache
 		if (mpIter != mp.end())
 		{
 			mpIter->second.value = value;
-
 			updateLevel(mpIter);
 		}
 		else
@@ -78,6 +84,9 @@ namespace cache
 				auto& ListW = freq[minFreq];
 				mp.erase(ListW.back());
 				ListW.pop_back();
+
+				if (ListW.empty())
+					freq.erase(minFreq);
 			}
 
 			minFreq = 0;
@@ -97,7 +106,6 @@ namespace cache
 		if (mpIter != mp.end())
 		{
 			mpIter->second.value = std::move(value);
-
 			updateLevel(mpIter);
 		}
 		else
@@ -108,6 +116,9 @@ namespace cache
 				auto& ListW = freq[minFreq];
 				mp.erase(ListW.back());
 				ListW.pop_back();
+
+				if (ListW.empty())
+					freq.erase(minFreq);
 			}
 
 			minFreq = 0;
@@ -128,7 +139,6 @@ namespace cache
 		if (mpIter != mp.end())
 		{
 			mpIter->second.value = Value(std::forward<Args>(args)...);
-
 			updateLevel(mpIter);
 		}
 		else
@@ -139,6 +149,9 @@ namespace cache
 				auto& ListW = freq[minFreq];
 				mp.erase(ListW.back());
 				ListW.pop_back();
+
+				if (ListW.empty())
+					freq.erase(minFreq);
 			}
 
 			minFreq = 0;
@@ -161,12 +174,86 @@ namespace cache
 	}
 
 	template<typename Key, typename Value>
-	const Value & LFU<Key, Value>::peek(const Key& key) const
+	const Value& LFU<Key, Value>::peek(const Key& key) const
 	{
 		auto mpIter = mp.find(key);
 		if (mpIter == mp.end())
 			throw KeyNotFound();
 
 		return mpIter->second.value;
+	}
+
+	template<typename Key, typename Value>
+	bool LFU<Key, Value>::erase(const Key& key)
+	{
+		auto mpIter = mp.find(key);
+		if (mpIter == mp.end())
+			return false;
+
+		std::size_t     oldFreq = mpIter->second.freq;
+		std::list<Key>& oldList = freq[oldFreq];
+
+		oldList.erase(mpIter->second.iter);
+		mp.erase(mpIter);
+
+		// update lvl if needed
+		if (oldFreq == minFreq && freq[oldFreq].empty())
+		{
+			freq.erase(oldFreq);
+
+			if (!mp.empty())
+			{
+				minFreq = freq.begin()->first;
+				for (auto& p : freq)
+				{
+					std::size_t f = p.first;
+					if (f < minFreq) minFreq = f;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	template<typename Key, typename Value>
+	void LFU<Key, Value>::clear()
+	{
+		mp.clear();
+		freq.clear();
+		minFreq = 0;
+	}
+
+	template<typename Key, typename Value>
+	void LFU<Key, Value>::set_capacity(std::size_t newCap)
+	{
+		capacity_ = newCap;
+
+		// Remove element if actual capacity less previous
+		while (mp.size() > capacity_)
+		{
+			std::list<Key>& ListW = freq[minFreq];
+
+			while (!ListW.empty() && mp.size() > capacity_)
+			{
+				mp.erase(ListW.back());
+				ListW.pop_back();
+			}
+
+			if (ListW.empty())
+			{
+				freq.erase(minFreq);
+
+				if (!mp.empty())
+				{
+					minFreq = freq.begin()->first;
+					for (auto& p : freq)
+					{
+						std::size_t f = p.first;
+						if (f < minFreq) minFreq = f;
+					}
+				}
+			}
+
+		}
 	}
 }
