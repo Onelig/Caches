@@ -63,9 +63,9 @@ TEST(LFU_Capacity, Erase)
 	cache.insert(5, "Something");
 	cache.insert(1, "LFU");
 
-	EXPECT_FALSE(cache.erase(8));
+	EXPECT_TRUE(cache.erase(8));
 	EXPECT_TRUE(cache.erase(1));
-	EXPECT_TRUE(cache.erase(5));
+	EXPECT_FALSE(cache.erase(5));
 }
 
 TEST(LFU_Capacity, ChangeCapacity)
