@@ -8,6 +8,11 @@ namespace cache
 	template<typename Key, typename Value>
 	class LFU
 	{
+		static_assert(
+			has_hash<Key>::value || has_less_comp<Key>::value,
+			"Key must be hashable (unordered_map) or less-comparable (map)"
+		);
+
 	private:
 		struct data
 		{
@@ -15,8 +20,15 @@ namespace cache
 			std::size_t freqS;
 			typename std::list<Key>::iterator iter;
 		};
+		using mapKeyData = std::conditional_t<has_hash<Key>::value,
+								std::unordered_map<Key, data>,
+								std::map<Key, data>>;
 
-		void updateLevel(typename std::unordered_map<Key, data>::iterator mpIter);
+		using mapFreqList = std::conditional_t<has_hash<Key>::value,
+								std::unordered_map<std::size_t, std::list<Key>>,
+								std::map<std::size_t, std::list<Key>>>;
+
+		void updateLevel(typename mapKeyData::iterator mpIter);
 	public:
 		LFU(std::size_t capacity);
 
@@ -40,17 +52,18 @@ namespace cache
 
 		Value& operator[](const Key& key);
 		const Value& operator[](const Key& key) const;
+
 	private:
 		std::size_t capacity_;
 		std::size_t minFreq;
 
-		std::unordered_map<Key, data> mp;
-		std::unordered_map<std::size_t, std::list<Key>> freq;
+		mapKeyData mp;
+		mapFreqList freq;
 	};
 
 
 	template<typename Key, typename Value>
-	void LFU<Key, Value>::updateLevel(typename std::unordered_map<Key, data>::iterator mpIter)
+	void LFU<Key, Value>::updateLevel(typename mapKeyData::iterator mpIter)
 	{
 		// Update level
 		std::size_t oldFreq = mpIter->second.freqS;
