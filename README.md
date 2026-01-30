@@ -7,7 +7,6 @@ Cache System is a C++14 project implementing high-performance key-value caches. 
 # LRU Cache — Least Recently Used Cache (C++14)
 LRU Cache is a least recently used cache that stores key-value pairs and automatically removes the least recently accessed elements when the cache reaches its capacity.
 
----
 # LFU Cache — Least Frequently Used Cache (C++14)
 LFU Cache stores key-value pairs and automatically removes the least frequently used elements when the cache reaches its capacity. Elements with higher access frequency remain in the cache longer, while new or rarely accessed elements are removed first.
 
