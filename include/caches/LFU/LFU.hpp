@@ -31,6 +31,15 @@ namespace cache
 		bool erase(const Key& key);
 		void clear();
 		void set_capacity(std::size_t newCap);
+
+		bool contains(const Key& key) const;
+		bool empty() const;
+		std::size_t size() const;
+		std::size_t capacity() const;
+		bool full() const;
+
+		Value& operator[](const Key& key);
+		const Value& operator[](const Key& key) const;
 	private:
 		std::size_t capacity_;
 		std::size_t minFreq;
@@ -255,5 +264,47 @@ namespace cache
 			}
 
 		}
+	}
+
+	template<typename Key, typename Value>
+	bool LFU<Key, Value>::contains(const Key &key) const
+	{
+		return mp.find(key) != mp.end();
+	}
+
+	template<typename Key, typename Value>
+	bool LFU<Key, Value>::empty() const
+	{
+		return mp.empty();
+	}
+
+	template<typename Key, typename Value>
+	std::size_t LFU<Key, Value>::size() const
+	{
+		return mp.size();
+	}
+
+	template<typename Key, typename Value>
+	std::size_t LFU<Key, Value>::capacity() const
+	{
+		return capacity_;
+	}
+
+	template<typename Key, typename Value>
+	bool LFU<Key, Value>::full() const
+	{
+		return capacity_ == mp.size();
+	}
+
+	template<typename Key, typename Value>
+	Value& LFU<Key, Value>::operator[](const Key &key)
+	{
+		return get(key);
+	}
+
+	template<typename Key, typename Value>
+	const Value& LFU<Key, Value>::operator[](const Key &key) const
+	{
+		return peek(key);
 	}
 }
