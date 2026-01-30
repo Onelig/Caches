@@ -53,11 +53,11 @@ namespace cache
 	void LFU<Key, Value>::updateLevel(typename std::unordered_map<Key, data>::iterator mpIter)
 	{
 		// Update level
-		std::size_t oldFreq = mpIter->second.freq;
+		std::size_t oldFreq = mpIter->second.freqS;
 		std::list<Key>& oldList = freq[oldFreq];
 
-		++mpIter->second.freq;
-		std::list<Key>& newList = freq[mpIter->second.freq];
+		++mpIter->second.freqS;
+		std::list<Key>& newList = freq[mpIter->second.freqS];
 
 		newList.splice(newList.begin(), oldList, mpIter->second.iter);
 
@@ -90,7 +90,7 @@ namespace cache
 			if (capacity_ == mp.size())
 			{
 				// Remove element with min level
-				auto& ListW = freq[minFreq];
+				std::list<Key>& ListW = freq[minFreq];
 				mp.erase(ListW.back());
 				ListW.pop_back();
 
@@ -99,7 +99,7 @@ namespace cache
 			}
 
 			minFreq = 0;
-			auto& ListW = freq[minFreq];
+			std::list<Key>& ListW = freq[minFreq];
 			ListW.push_front(key);
 			mp[key] = data{value, minFreq, ListW.begin()};
 		}
@@ -155,7 +155,7 @@ namespace cache
 			if (capacity_ == mp.size())
 			{
 				// Remove element with min level
-				auto& ListW = freq[minFreq];
+				std::list<Key>& ListW = freq[minFreq];
 				mp.erase(ListW.back());
 				ListW.pop_back();
 
@@ -164,7 +164,7 @@ namespace cache
 			}
 
 			minFreq = 0;
-			auto& ListW = freq[minFreq];
+			std::list<Key>& ListW = freq[minFreq];
 			ListW.push_front(key);
 			mp[key] = data{Value(std::forward<Args>(args)...), minFreq, ListW.begin()};
 		}
@@ -199,7 +199,7 @@ namespace cache
 		if (mpIter == mp.end())
 			return false;
 
-		std::size_t     oldFreq = mpIter->second.freq;
+		std::size_t     oldFreq = mpIter->second.freqS;
 		std::list<Key>& oldList = freq[oldFreq];
 
 		oldList.erase(mpIter->second.iter);
